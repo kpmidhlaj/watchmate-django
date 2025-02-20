@@ -5,7 +5,7 @@ import logging
 from django.db.models import Avg
 from rest_framework import status, generics, viewsets
 from rest_framework.decorators import api_view
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -64,11 +64,13 @@ from watchlist_app.models import (Watchlist,StreamPlatform,Review)
 class ReviewList(generics.ListAPIView):
     # queryset = Review.objects.all()
     serializer_class = ReviewSerializer
-    permission_classes = [AdminOrReadOnly]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         pk = self.kwargs['pk']
         return Review.objects.filter(watchlist=pk)
+    def permission_denied(self, request, message=None, code=None):
+        raise PermissionDenied(detail="You do not have permission to modify the review list.")
 
 
 class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -76,38 +78,55 @@ class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [ReviewUserOrReadOnly]
     serializer_class = ReviewSerializer
 
+    def permission_denied(self, request, message=None, code=None):
+        raise PermissionDenied(detail="You do not have permission to modify the review.")
+
 class ReviewCreate(generics.CreateAPIView):
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        pk = self.kwargs.get('pk')
-        watchlist = get_object_or_404(Watchlist, pk=pk)
-        review_user = self.request.user
+    class ReviewCreate(generics.CreateAPIView):
+        serializer_class = ReviewSerializer
+        permission_classes = [IsAuthenticated]
 
-        logging.info(f"Checking review for user {review_user} on watchlist {watchlist.pk}")
+        def perform_create(self, serializer):
+            pk = self.kwargs.get('pk')
+            watchlist = get_object_or_404(Watchlist, pk=pk)
+            review_user = self.request.user
 
-        # Ensure user cannot submit multiple reviews
-        if Review.objects.filter(watchlist=watchlist, review_user=review_user, active=True).exists():
-            logging.info(f"Review already exists for user {review_user} on watchlist {watchlist.pk}")
-            raise ValidationError("You have already reviewed this watchlist.")
+            # Check if the user has already reviewed this watchlist
+            existing_review = Review.objects.filter(watchlist=watchlist, review_user=review_user, active=True).first()
 
-        # Calculate new rating
-        new_rating = serializer.validated_data['rating']
+            new_rating = serializer.validated_data['rating']
+            if new_rating > 5 or new_rating < 0:
+                raise ValidationError({"message": "Rating must be between 0 and 5."})
 
-        if watchlist.number_rating == 0:
-            watchlist.avg_rating = new_rating
-        else:
-            total_rating_sum = watchlist.avg_rating * watchlist.number_rating
-            watchlist.avg_rating = (total_rating_sum + new_rating) / (watchlist.number_rating + 1)
+            if existing_review:
+                # If the review exists, update it instead of creating a new one
+                existing_review.rating = new_rating
+                existing_review.description = serializer.validated_data.get('description', existing_review.description)
+                existing_review.save()
 
-        watchlist.number_rating += 1
-        watchlist.save()
+                # Recalculate the average rating
+                all_reviews = Review.objects.filter(watchlist=watchlist, active=True)
+                watchlist.avg_rating = all_reviews.aggregate(Avg('rating'))['rating__avg'] or 0
+                watchlist.save()
 
-        logging.info(
-            f"Updated Watchlist ({watchlist.pk}) ratings: avg_rating = {watchlist.avg_rating}, number_rating = {watchlist.number_rating}")
+                raise ValidationError(
+                    {"message": "Your review has been updated."})
 
-        serializer.save(watchlist=watchlist, review_user=review_user)
+            else:
+
+                if watchlist.number_rating == 0:
+                    watchlist.avg_rating = new_rating
+                else:
+                    total_rating_sum = watchlist.avg_rating * watchlist.number_rating
+                    watchlist.avg_rating = (total_rating_sum + new_rating) / (watchlist.number_rating + 1)
+
+                watchlist.number_rating += 1
+                watchlist.save()
+
+                serializer.save(watchlist=watchlist, review_user=review_user)
 
 
 # Generic View

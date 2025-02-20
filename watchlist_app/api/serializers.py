@@ -17,11 +17,13 @@ class ReviewSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        user = self.context['request'].user
-        watchlist = data['watchlist']
+        user = self.context['request'].user  # Get the logged-in user
+        watchlist = data['watchlist']  # Get the watchlist being reviewed
 
-        if Review.objects.filter(review_user=user, watchlist=watchlist).exists():
-            raise serializers.ValidationError("You have already reviewed this watchlist.")
+        # Check if the request is for update
+        if self.instance is None:  # Only enforce for new reviews
+            if Review.objects.filter(review_user=user, watchlist=watchlist).exists():
+                raise serializers.ValidationError("You have already reviewed this watchlist.")
 
         return data
 
