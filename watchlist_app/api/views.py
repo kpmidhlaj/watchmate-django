@@ -1,3 +1,8 @@
+import logging
+from venv import logger
+import logging
+
+from django.db.models import Avg
 from rest_framework import status, generics, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
@@ -73,17 +78,37 @@ class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class ReviewCreate(generics.CreateAPIView):
     serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        return Review.objects.all()
     def perform_create(self, serializer):
         pk = self.kwargs.get('pk')
-        watchlist = Watchlist.objects.get(pk=pk)
+        watchlist = get_object_or_404(Watchlist, pk=pk)
         review_user = self.request.user
-        review_queryset = Review.objects.filter(watchlist=watchlist, review_user=review_user)
-        if review_queryset.exists():
-            return ValidationError('You have already reviewed this watchlist')
-        serializer.save(watchlist=watchlist,review_user=review_user)
+
+        logging.info(f"Checking review for user {review_user} on watchlist {watchlist.pk}")
+
+        # Ensure user cannot submit multiple reviews
+        if Review.objects.filter(watchlist=watchlist, review_user=review_user, active=True).exists():
+            logging.info(f"Review already exists for user {review_user} on watchlist {watchlist.pk}")
+            raise ValidationError("You have already reviewed this watchlist.")
+
+        # Calculate new rating
+        new_rating = serializer.validated_data['rating']
+
+        if watchlist.number_rating == 0:
+            watchlist.avg_rating = new_rating
+        else:
+            total_rating_sum = watchlist.avg_rating * watchlist.number_rating
+            watchlist.avg_rating = (total_rating_sum + new_rating) / (watchlist.number_rating + 1)
+
+        watchlist.number_rating += 1
+        watchlist.save()
+
+        logging.info(
+            f"Updated Watchlist ({watchlist.pk}) ratings: avg_rating = {watchlist.avg_rating}, number_rating = {watchlist.number_rating}")
+
+        serializer.save(watchlist=watchlist, review_user=review_user)
+
 
 # Generic View
 
