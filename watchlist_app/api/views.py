@@ -12,8 +12,8 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 
 from watchlist_app.api.permissions import IsAdminOrReadOnly, IsReviewUserOrReadOnly
-from watchlist_app.api.serializers import (WatchlistSerializer,StreamPlatformSerializer,ReviewSerializer)
-from watchlist_app.models import (Watchlist,StreamPlatform,Review)
+from watchlist_app.api.serializers import (WatchlistSerializer, StreamPlatformSerializer, ReviewSerializer)
+from watchlist_app.models import (Watchlist, StreamPlatform, Review)
 
 
 # ////function base view
@@ -69,6 +69,7 @@ class ReviewList(generics.ListAPIView):
     def get_queryset(self):
         pk = self.kwargs['pk']
         return Review.objects.filter(watchlist=pk)
+
     def permission_denied(self, request, message=None, code=None):
         raise PermissionDenied(detail="You do not have permission to modify the review list.")
 
@@ -82,49 +83,48 @@ class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
         raise PermissionDenied(detail="You do not have permission to modify the review.")
 
 
-
 class ReviewCreate(generics.CreateAPIView):
-        serializer_class = ReviewSerializer
-        permission_classes = [IsAuthenticated]
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
 
-        def perform_create(self, serializer):
-            pk = self.kwargs.get('pk')
-            watchlist = get_object_or_404(Watchlist, pk=pk)
-            review_user = self.request.user
+    def perform_create(self, serializer):
+        pk = self.kwargs.get('pk')
+        watchlist = get_object_or_404(Watchlist, pk=pk)
+        review_user = self.request.user
 
-            # Check if the user has already reviewed this watchlist
-            existing_review = Review.objects.filter(watchlist=watchlist, review_user=review_user, active=True).first()
+        # Check if the user has already reviewed this watchlist
+        existing_review = Review.objects.filter(watchlist=watchlist, review_user=review_user, active=True).first()
 
-            new_rating = serializer.validated_data['rating']
-            if new_rating > 5 or new_rating < 0:
-                raise ValidationError({"message": "Rating must be between 0 and 5."})
+        new_rating = serializer.validated_data['rating']
+        if new_rating > 5 or new_rating < 0:
+            raise ValidationError({"message": "Rating must be between 0 and 5."})
 
-            if existing_review:
-                # If the review exists, update it instead of creating a new one
-                existing_review.rating = new_rating
-                existing_review.description = serializer.validated_data.get('description', existing_review.description)
-                existing_review.save()
+        if existing_review:
+            # If the review exists, update it instead of creating a new one
+            existing_review.rating = new_rating
+            existing_review.description = serializer.validated_data.get('description', existing_review.description)
+            existing_review.save()
 
-                # Recalculate the average rating
-                all_reviews = Review.objects.filter(watchlist=watchlist, active=True)
-                watchlist.avg_rating = all_reviews.aggregate(Avg('rating'))['rating__avg'] or 0
-                watchlist.save()
+            # Recalculate the average rating
+            all_reviews = Review.objects.filter(watchlist=watchlist, active=True)
+            watchlist.avg_rating = all_reviews.aggregate(Avg('rating'))['rating__avg'] or 0
+            watchlist.save()
 
-                raise ValidationError(
-                    {"message": "Your review has been updated."})
+            raise ValidationError(
+                {"message": "Your review has been updated."})
 
+        else:
+
+            if watchlist.number_rating == 0:
+                watchlist.avg_rating = new_rating
             else:
+                total_rating_sum = watchlist.avg_rating * watchlist.number_rating
+                watchlist.avg_rating = (total_rating_sum + new_rating) / (watchlist.number_rating + 1)
 
-                if watchlist.number_rating == 0:
-                    watchlist.avg_rating = new_rating
-                else:
-                    total_rating_sum = watchlist.avg_rating * watchlist.number_rating
-                    watchlist.avg_rating = (total_rating_sum + new_rating) / (watchlist.number_rating + 1)
+            watchlist.number_rating += 1
+            watchlist.save()
 
-                watchlist.number_rating += 1
-                watchlist.save()
-
-                serializer.save(watchlist=watchlist, review_user=review_user)
+            serializer.save(watchlist=watchlist, review_user=review_user)
 
 
 # Generic View
@@ -155,19 +155,21 @@ class ReviewCreate(generics.CreateAPIView):
 # ////class base view
 
 class WatchListAv(APIView):
-     permission_classes = [IsAdminOrReadOnly]
-     def get(self, request):
-         movies = Watchlist.objects.all()
-         serializer = WatchlistSerializer(movies, many=True)
-         return Response(serializer.data)
+    permission_classes = [IsAdminOrReadOnly]
 
-     def post(self, request):
-         serializer = WatchlistSerializer(data=request.data)
-         if serializer.is_valid():
-             serializer.save()
-             return Response(serializer.data)
-         else:
-             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def get(self, request):
+        movies = Watchlist.objects.all()
+        serializer = WatchlistSerializer(movies, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = WatchlistSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class WatchDetailAV(APIView):
     permission_classes = [IsAdminOrReadOnly]
@@ -200,6 +202,7 @@ class WatchDetailAV(APIView):
         movie.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 # Model Viewset
 class StreamPlatformVS(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
@@ -226,7 +229,6 @@ class StreamPlatformVS(viewsets.ModelViewSet):
 #             return Response(serializer.data)
 #         else:
 #             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 # class StreamPlatformAv(APIView):
@@ -272,4 +274,3 @@ class StreamPlatformVS(viewsets.ModelViewSet):
 #             return Response({'message': 'Platform not found'}, status=status.HTTP_400_BAD_REQUEST)
 #         platform.delete()
 #         return Response(status=status.HTTP_204_NO_CONTENT)
-

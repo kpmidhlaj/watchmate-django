@@ -15,6 +15,7 @@ class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = '__all__'
+
     def validate(self, data):
         user = self.context['request'].user  # Get the logged-in user
         watchlist = data['watchlist']  # Get the watchlist being reviewed
