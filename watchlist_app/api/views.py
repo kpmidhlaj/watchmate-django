@@ -3,15 +3,16 @@ from venv import logger
 import logging
 
 from django.db.models import Avg
-from rest_framework import status, generics, viewsets
+from rest_framework import status, generics, viewsets, filters
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError, PermissionDenied
+from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle, ScopedRateThrottle
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-
+from django_filters.rest_framework import DjangoFilterBackend
 from user_app.api.throtlling import ReviewListThrottle, ReviewCreateThrottle
 from watchlist_app.api.permissions import IsAdminOrReadOnly, IsReviewUserOrReadOnly
 from watchlist_app.api.serializers import (WatchlistSerializer, StreamPlatformSerializer, ReviewSerializer)
@@ -61,13 +62,31 @@ from watchlist_app.models import (Watchlist, StreamPlatform, Review)
 #         movie.delete()
 #         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
+class UserReview(generics.ListAPIView):
+    serializer_class = ReviewSerializer
+
+    # def get_queryset(self):
+    #     username = self.kwargs.get('username')
+    #     return Review.objects.filter(review_user__username=username)
+
+    def get_queryset(self):
+        username = self.request.GET.get('username')
+        if not username:
+            return Review.objects.none()
+        else:
+            return Review.objects.filter(review_user__username=username)
+
+
 # Concreate view
 
 class ReviewList(generics.ListAPIView):
     # queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
-    throttle_classes = [ReviewListThrottle,AnonRateThrottle]
+    throttle_classes = [ReviewListThrottle, AnonRateThrottle]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['review_user__username', 'active']
 
     def get_queryset(self):
         pk = self.kwargs['pk']
@@ -158,7 +177,15 @@ class ReviewCreate(generics.CreateAPIView):
 #     def post(self, request, *args, **kwargs):
 #         return self.create(request, *args, **kwargs)
 
+class WatchListGV (generics.ListAPIView):
+    queryset = Watchlist.objects.all()
+    serializer_class = WatchlistSerializer
+
+    filter_backends = [filters.OrderingFilter ]
+    filterset_fields = ['avg_rating']
+
 # ////class base view
+
 
 class WatchListAv(APIView):
     permission_classes = [IsAdminOrReadOnly]
