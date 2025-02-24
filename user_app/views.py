@@ -11,9 +11,11 @@ from user_app.api.serializers import RegistrationSerializer
 
 @api_view(['POST'])
 def logout_view(request):
-    if request.method == 'POST':
-        request.user.auth_token.delete()
-        return Response(status=status.HTTP_200_OK)
+    if not request.user.is_authenticated:
+        return Response({"error": "User is not authenticated"}, status=status.HTTP_400_BAD_REQUEST)
+
+    request.user.auth_token.delete()
+    return Response({"message": "Logged out successfully"}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

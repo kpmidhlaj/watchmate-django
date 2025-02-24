@@ -8,9 +8,11 @@ from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle, ScopedRateThrottle
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 
+from user_app.api.throtlling import ReviewListThrottle, ReviewCreateThrottle
 from watchlist_app.api.permissions import IsAdminOrReadOnly, IsReviewUserOrReadOnly
 from watchlist_app.api.serializers import (WatchlistSerializer, StreamPlatformSerializer, ReviewSerializer)
 from watchlist_app.models import (Watchlist, StreamPlatform, Review)
@@ -65,6 +67,7 @@ class ReviewList(generics.ListAPIView):
     # queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
+    throttle_classes = [ReviewListThrottle,AnonRateThrottle]
 
     def get_queryset(self):
         pk = self.kwargs['pk']
@@ -78,6 +81,8 @@ class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Review.objects.all()
     permission_classes = [IsReviewUserOrReadOnly]
     serializer_class = ReviewSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'review-detail'
 
     def permission_denied(self, request, message=None, code=None):
         raise PermissionDenied(detail="You do not have permission to modify the review.")
@@ -86,6 +91,7 @@ class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
 class ReviewCreate(generics.CreateAPIView):
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ReviewCreateThrottle, AnonRateThrottle]
 
     def perform_create(self, serializer):
         pk = self.kwargs.get('pk')
