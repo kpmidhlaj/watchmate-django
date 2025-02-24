@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
+from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -125,8 +125,15 @@ REST_FRAMEWORK = {
     # ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         # 'rest_framework.authentication.BasicAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
+        # 'rest_framework.authentication.TokenAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ]
+}
+SIMPLE_JWT = {
+    'ROTATE_REFRESH_TOKENS': True,
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=15),
+
 }
 LOGGING = {
     "version": 1,
@@ -145,7 +152,7 @@ LOGGING = {
         "file": {
             "level": "DEBUG",
             "class": "logging.FileHandler",
-            "filename": "django_debug.log",  # Log file name
+            "filename": "django_debug.log",
             "formatter": "verbose",
         },
         "console": {
@@ -160,7 +167,7 @@ LOGGING = {
             "level": "DEBUG",
             "propagate": True,
         },
-        "watchlist_app": {  # Custom logger for your app
+        "watchlist_app": {
             "handlers": ["file", "console"],
             "level": "DEBUG",
             "propagate": False,
