@@ -177,12 +177,13 @@ class ReviewCreate(generics.CreateAPIView):
 #     def post(self, request, *args, **kwargs):
 #         return self.create(request, *args, **kwargs)
 
-class WatchListGV (generics.ListAPIView):
+class WatchListGV(generics.ListAPIView):
     queryset = Watchlist.objects.all()
     serializer_class = WatchlistSerializer
 
-    filter_backends = [filters.OrderingFilter ]
+    filter_backends = [filters.OrderingFilter]
     filterset_fields = ['avg_rating']
+
 
 # ////class base view
 
