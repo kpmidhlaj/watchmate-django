@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from user_app.api.throtlling import ReviewListThrottle, ReviewCreateThrottle
+from watchlist_app.api.pagination import WatchListPagination, LOPagination, WatchListCPagination
 from watchlist_app.api.permissions import IsAdminOrReadOnly, IsReviewUserOrReadOnly
 from watchlist_app.api.serializers import (WatchlistSerializer, StreamPlatformSerializer, ReviewSerializer)
 from watchlist_app.models import (Watchlist, StreamPlatform, Review)
@@ -180,7 +181,7 @@ class ReviewCreate(generics.CreateAPIView):
 class WatchListGV(generics.ListAPIView):
     queryset = Watchlist.objects.all()
     serializer_class = WatchlistSerializer
-
+    pagination_class = WatchListCPagination
     filter_backends = [filters.OrderingFilter]
     filterset_fields = ['avg_rating']
 
