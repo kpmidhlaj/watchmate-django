@@ -31,3 +31,6 @@ django_debug.log  # Ignore debug log file
 **/__pycache__/
 migrations/__pycache__/
 
+
+.idea/
+db.sqlite3
