@@ -1,1 +1,32 @@
+
+# Virtual environment
 menv/
+
+# Python files
+*.pyc
+*.pyo
+__pycache__/
+
+# Django-specific
+.env
+*.log
+db.sqlite3
+media/
+staticfiles/
+local_settings.py
+
+# Ignore system files (Linux)
+*~
+*.swp
+*.swo
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Ignore migrations cache
+**/__pycache__/
+migrations/__pycache__/
+
